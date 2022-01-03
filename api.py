@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 import sys
 from random import uniform
-from time import sleep
+from time import sleep, strftime
 from typing import Any, Dict, Optional, Union
 
 from aiohttp import ClientSession
 from rich.console import Console
+
+
+def get_time() -> str:
+    return f"{strftime('%Y-%m-%d %H:%M:%S')} | "
 
 
 class VBitve:
@@ -78,14 +82,14 @@ class VBitve:
             ) as req:
                 r: Dict[str, Any] = await req.json()
         except Exception as e:
-            self._c.print(f"[red]{endpoint}: {e}[/red]")
+            self._c.print(f"{get_time()}[red]{endpoint}: {e}[/red]")
             sleep(uniform(self._MIN_DELAY, self._MAX_DELAY))
             return await self._req(endpoint, params=params, json=json)
         if "banned" in r:
-            self._c.print("[red]Banned[/red]")
+            self._c.print(f"{get_time()}[red]Banned[/red]")
             sys.exit()
         error = r.get("error")
         if error is None:
             return r
-        self._c.print(f"[red]{endpoint}: {error}[/red]")
+        self._c.print(f"{get_time()}[red]{endpoint}: {error}[/red]")
         return {}

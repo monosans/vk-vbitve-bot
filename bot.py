@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.live import Live
 from rich.table import Table
 
-from api import VBitve
+from api import VBitve, get_time
 from config import (
     ATTACK,
     ATTACK_EXCLUDE,
@@ -63,7 +63,7 @@ async def bot(
                     text = attack["snackbar"]["text"].replace(
                         "Вы напали и украли:\n", "+"
                     )
-                    console.print(f"Напал на {target}: {text}")
+                    console.print(f"{get_time()}Напал на {target}: {text}")
                 await sleep_delay()
     cur_time = time() * 1000
     if (
@@ -74,14 +74,14 @@ async def bot(
         train = await client.train()
         if train:
             profile.update(train["new_user"])
-            console.print(f"Тренирую армию -{profile.train_cost}$")
+            console.print(f"{get_time()}Тренирую армию -{profile.train_cost}$")
             live.update(get_table(profile), refresh=True)
         await sleep_delay()
     elif CONTRACT and profile.next_contract < cur_time:
         contract = await client.contract()
         if contract:
             profile.update(contract["new_user"])
-            console.print(f"Беру контракт +{profile.contract}$")
+            console.print(f"{get_time()}Беру контракт +{profile.contract}$")
             live.update(get_table(profile), refresh=True)
         await sleep_delay()
     time_to_wait = (
@@ -96,7 +96,8 @@ async def bot(
         + 1
     )
     console.print(
-        f"Жду {time_to_wait} секунд до окончания ближайшей перезарядки"
+        get_time()
+        + f"Жду {time_to_wait} секунд до окончания ближайшей перезарядки"
     )
     await asyncio.sleep(time_to_wait)
 
