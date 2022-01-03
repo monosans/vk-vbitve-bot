@@ -109,7 +109,7 @@ def get_table(profile: Profile) -> Table:
         ("Размер армии", "magenta"),
         ("Сила армии", "green"),
     ):
-        table.add_column(header, style=style)
+        table.add_column(header, style=style, justify="center")
     table.add_row(
         *map(str, (profile.balance, len(profile.army_size), profile.power))
     )
