@@ -1,5 +1,4 @@
-python -m pip install -U pip setuptools wheel
-python -m pip install -U aiohttp rich
+python -m pip install -U requests rich
 cls
 python bot.py
 Pause

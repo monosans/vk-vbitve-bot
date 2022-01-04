@@ -4,7 +4,7 @@ from random import uniform
 from time import sleep, strftime
 from typing import Any, Dict, Optional, Union
 
-from aiohttp import ClientSession
+from requests import Session
 from rich.console import Console
 
 
@@ -16,7 +16,7 @@ class VBitve:
     def __init__(
         self,
         console: Console,
-        session: ClientSession,
+        session: Session,
         vk_auth: str,
         friends_header: str,
         user_agent: str,
@@ -26,10 +26,8 @@ class VBitve:
         """
         vk_auth (str): vk_access_token_settings...
         user_agent (str): User agent браузера.
-        min_delay (float): Мин. задержка между одинаковыми запросами в
-            секундах.
-        max_delay (float): Макс. задержка между одинаковыми запросами в
-            секундах.
+        min_delay (float): Мин. задержка между запросами в секундах.
+        max_delay (float): Макс. задержка между запросами в секундах.
         """
         self._c = console
         self._s = session
@@ -43,29 +41,29 @@ class VBitve:
         self._MIN_DELAY = min_delay
         self._MAX_DELAY = max_delay
 
-    async def get(self) -> Dict[str, Any]:
-        return await self._req("get", json={"to": ""})
+    def get(self) -> Dict[str, Any]:
+        return self._req("get", json={"to": ""})
 
-    async def privacy(self, hidden: str) -> Dict[str, Any]:
+    def privacy(self, hidden: str) -> Dict[str, Any]:
         """hidden: 0 или 1."""
-        return await self._req("privacy", params={"hidden": hidden})
+        return self._req("privacy", params={"hidden": hidden})
 
-    async def contract(self) -> Dict[str, Any]:
-        return await self._req("contract")
+    def contract(self) -> Dict[str, Any]:
+        return self._req("contract")
 
-    async def attack(self, user_id: int) -> Dict[str, Any]:
-        return await self._req("attack", json={"to": user_id})
+    def attack(self, user_id: int) -> Dict[str, Any]:
+        return self._req("attack", json={"to": user_id})
 
-    async def for_me(self) -> Dict[str, Any]:
-        return await self._req("for_me")
+    def for_me(self) -> Dict[str, Any]:
+        return self._req("for_me")
 
-    async def rating(self) -> Dict[str, Any]:
-        return await self._req("rating")
+    def rating(self) -> Dict[str, Any]:
+        return self._req("rating")
 
-    async def train(self) -> Dict[str, Any]:
-        return await self._req("train")
+    def train(self) -> Dict[str, Any]:
+        return self._req("train")
 
-    async def _req(
+    def _req(
         self,
         endpoint: str,
         *,
@@ -73,18 +71,18 @@ class VBitve:
         json: Optional[Dict[str, Union[str, int]]] = None,
     ) -> Dict[str, Any]:
         try:
-            async with self._s.request(
+            with self._s.request(
                 "GET" if json is None else "POST",
                 f"https://www.inbattle.space/{endpoint}",
                 headers=self._headers,
                 params=params,
                 json=json,
             ) as req:
-                r: Dict[str, Any] = await req.json()
+                r: Dict[str, Any] = req.json()
         except Exception as e:
             self._c.print(f"{get_time()}[red]{endpoint}: {e}[/red]")
             sleep(uniform(self._MIN_DELAY, self._MAX_DELAY))
-            return await self._req(endpoint, params=params, json=json)
+            return self._req(endpoint, params=params, json=json)
         if "banned" in r:
             self._c.print(f"{get_time()}[red]Banned[/red]")
             sys.exit()

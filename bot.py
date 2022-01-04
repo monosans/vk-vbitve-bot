@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import asyncio
 from random import uniform
-from time import time
+from time import sleep, time
 from typing import Any, Dict, NoReturn
 
-from aiohttp import ClientSession
+from requests import Session
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
@@ -39,16 +38,16 @@ class Profile:
         self.train_cost = profile["trainCost"]
 
 
-async def sleep_delay() -> None:
-    await asyncio.sleep(uniform(MIN_DELAY, MAX_DELAY))
+def sleep_delay() -> None:
+    sleep(uniform(MIN_DELAY, MAX_DELAY))
 
 
-async def bot(
+def bot(
     client: VBitve, profile: Profile, console: Console, live: Live
 ) -> None:
     if ATTACK and profile.next_attack < time() * 1000:
-        targets = await client.for_me()
-        await sleep_delay()
+        targets = client.for_me()
+        sleep_delay()
         if targets:
             users = targets["items"]
             target = 0
@@ -57,33 +56,33 @@ async def bot(
                 if target not in ATTACK_EXCLUDE:
                     break
             if target:
-                attack = await client.attack(target)
+                attack = client.attack(target)
                 if attack:
                     profile.update(attack["new_user"])
                     text = attack["snackbar"]["text"].replace(
                         "Вы напали и украли:\n", "+"
                     )
                     console.print(f"{get_time()}Напал на {target}: {text}")
-                await sleep_delay()
+                sleep_delay()
     cur_time = time() * 1000
     if (
         TRAIN
         and profile.balance >= profile.train_cost
         and profile.next_train < cur_time
     ):
-        train = await client.train()
+        train = client.train()
         if train:
             profile.update(train["new_user"])
             console.print(f"{get_time()}Тренирую армию -{profile.train_cost}$")
             live.update(get_table(profile), refresh=True)
-        await sleep_delay()
+        sleep_delay()
     elif CONTRACT and profile.next_contract < cur_time:
-        contract = await client.contract()
+        contract = client.contract()
         if contract:
             profile.update(contract["new_user"])
             console.print(f"{get_time()}Беру контракт +{profile.contract}$")
             live.update(get_table(profile), refresh=True)
-        await sleep_delay()
+        sleep_delay()
     time_to_wait = (
         int(
             min(
@@ -99,11 +98,11 @@ async def bot(
         get_time()
         + f"Жду {time_to_wait} секунд до окончания ближайшей перезарядки"
     )
-    await asyncio.sleep(time_to_wait)
+    sleep(time_to_wait)
 
 
 def get_table(profile: Profile) -> Table:
-    table = Table(title="github.com/monosans/vk-vbitve-bot")
+    table = Table(title="github.com/monosans/vk-vbitve-bot v20210104")
     for header, style in (
         ("Баланс", "cyan"),
         ("Размер армии", "magenta"),
@@ -116,9 +115,9 @@ def get_table(profile: Profile) -> Table:
     return table
 
 
-async def main() -> NoReturn:
+def main() -> NoReturn:
     console = Console()
-    async with ClientSession() as session:
+    with Session() as session:
         client = VBitve(
             console,
             session,
@@ -128,14 +127,14 @@ async def main() -> NoReturn:
             MIN_DELAY,
             MAX_DELAY,
         )
-        profile = Profile(await client.get())
+        profile = Profile(client.get())
         with Live(
             get_table(profile), console=console, auto_refresh=False
         ) as live:
-            await sleep_delay()
+            sleep_delay()
             while True:
-                await bot(client, profile, console, live)
+                bot(client, profile, console, live)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
