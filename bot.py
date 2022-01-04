@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from random import uniform
 from time import sleep, time
-from typing import Any, Dict, NoReturn
+from typing import Any, Dict, List, NoReturn
 
 from requests import Session
 from rich.console import Console
@@ -28,14 +28,16 @@ class Profile:
         self.update(profile)
 
     def update(self, profile: Dict[str, Any]) -> None:
-        self.army_size = profile["army"]
-        self.balance = profile["balance"]
-        self.contract = profile["contract"]
-        self.next_attack = profile.get("nextAttack", 0)
-        self.next_contract = profile.get("nextContract", 0)
-        self.next_train = profile.get("nextTrain", 0)
-        self.power = profile["power"]
-        self.train_cost = profile["trainCost"]
+        self.army: List[Dict[str, Any]] = profile["army"]
+        self.balance: int = profile["balance"]
+        self.contract: int = profile["contract"]
+        self.next_attack: int = profile.get("nextAttack", 0)
+        self.next_contract: int = profile.get("nextContract", 0)
+        self.next_train: int = profile.get("nextTrain", 0)
+        self.power: int = profile["power"]
+        self.train_cost: int = profile["trainCost"]
+        self.cooldown = max(self.next_contract, self.next_train)
+        self.full_cooldown = min(self.next_attack, self.cooldown)
 
 
 def sleep_delay() -> None:
@@ -64,36 +66,26 @@ def bot(
                     )
                     console.print(f"{get_time()}Напал на {target}: {text}")
                 sleep_delay()
-    cur_time = time() * 1000
-    if (
-        TRAIN
-        and profile.balance >= profile.train_cost
-        and profile.next_train < cur_time
-    ):
-        train = client.train()
-        if train:
-            profile.update(train["new_user"])
-            console.print(f"{get_time()}Тренирую армию -{profile.train_cost}$")
-            live.update(get_table(profile), refresh=True)
-        sleep_delay()
-    elif CONTRACT and profile.next_contract < cur_time:
-        contract = client.contract()
-        if contract:
-            profile.update(contract["new_user"])
-            console.print(f"{get_time()}Беру контракт +{profile.contract}$")
-            live.update(get_table(profile), refresh=True)
-        sleep_delay()
-    time_to_wait = (
-        int(
-            min(
-                profile.next_attack,
-                max(profile.next_train, profile.next_contract),
-            )
-            / 1000
-            - time()
-        )
-        + 1
-    )
+    if profile.cooldown < time() * 1000:
+        if TRAIN and profile.balance >= profile.train_cost:
+            train = client.train()
+            if train:
+                profile.update(train["new_user"])
+                console.print(
+                    f"{get_time()}Тренирую армию -{profile.train_cost}$"
+                )
+                live.update(get_table(profile), refresh=True)
+            sleep_delay()
+        elif CONTRACT:
+            contract = client.contract()
+            if contract:
+                profile.update(contract["new_user"])
+                console.print(
+                    f"{get_time()}Беру контракт +{profile.contract}$"
+                )
+                live.update(get_table(profile), refresh=True)
+            sleep_delay()
+    time_to_wait = int(profile.full_cooldown / 1000 - time()) + 1
     if time_to_wait > 0:
         console.print(
             get_time()
@@ -103,7 +95,7 @@ def bot(
 
 
 def get_table(profile: Profile) -> Table:
-    table = Table(title="github.com/monosans/vk-vbitve-bot v20210104.1")
+    table = Table(title="github.com/monosans/vk-vbitve-bot v20210105")
     for header, style in (
         ("Баланс", "cyan"),
         ("Размер армии", "magenta"),
@@ -111,7 +103,7 @@ def get_table(profile: Profile) -> Table:
     ):
         table.add_column(header, style=style, justify="center")
     table.add_row(
-        *map(str, (profile.balance, len(profile.army_size), profile.power))
+        *map(str, (profile.balance, len(profile.army), profile.power))
     )
     return table
 
