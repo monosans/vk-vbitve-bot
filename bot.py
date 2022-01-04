@@ -94,15 +94,16 @@ def bot(
         )
         + 1
     )
-    console.print(
-        get_time()
-        + f"Жду {time_to_wait} секунд до окончания ближайшей перезарядки"
-    )
-    sleep(time_to_wait)
+    if time_to_wait > 0:
+        console.print(
+            get_time()
+            + f"Жду {time_to_wait} секунд до окончания ближайшей перезарядки"
+        )
+        sleep(time_to_wait)
 
 
 def get_table(profile: Profile) -> Table:
-    table = Table(title="github.com/monosans/vk-vbitve-bot v20210104")
+    table = Table(title="github.com/monosans/vk-vbitve-bot v20210104.1")
     for header, style in (
         ("Баланс", "cyan"),
         ("Размер армии", "magenta"),
