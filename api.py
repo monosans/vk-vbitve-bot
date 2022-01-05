@@ -1,27 +1,31 @@
 # -*- coding: utf-8 -*-
 import sys
 from random import uniform
-from time import sleep, strftime
+from time import sleep, strftime, time
 from typing import Any, Dict, Optional, Union
 
 from requests import Session
 from rich.console import Console
 
 
-def get_time() -> str:
-    return f"{strftime('%Y-%m-%d %H:%M:%S')} | "
+class Logger:
+    def __init__(self, console: Console) -> None:
+        self._c = console
+
+    def print(self, *objects: Any) -> None:
+        self._c.print(f"{strftime('%Y-%m-%d %H:%M:%S')} | ", *objects)
 
 
 class VBitve:
     def __init__(
         self,
-        console: Console,
         session: Session,
         vk_auth: str,
         friends_header: str,
         user_agent: str,
         min_delay: float,
         max_delay: float,
+        console: Optional[Console] = None,
     ) -> None:
         """
         vk_auth (str): vk_access_token_settings...
@@ -29,17 +33,20 @@ class VBitve:
         min_delay (float): Мин. задержка между запросами в секундах.
         max_delay (float): Макс. задержка между запросами в секундах.
         """
-        self._c = console
+        self.console = console or Console()
+        self.logger = Logger(self.console)
         self._s = session
+        origin = "https://prod-app7801617-8a6f43695867.pages-ac.vk-apps.com"
         self._headers = {
             "friends": str(friends_header),
-            "origin": "https://prod-app7801617-8a6f43695867.pages-ac.vk-apps.com",
-            "referer": "https://prod-app7801617-8a6f43695867.pages-ac.vk-apps.com/",
+            "origin": origin,
+            "referer": f"{origin}/",
             "user-agent": user_agent.strip(),
             "vk-auth": vk_auth.strip(),
         }
         self._MIN_DELAY = min_delay
         self._MAX_DELAY = max_delay
+        self._last_req_time: float = 0
 
     def get(self) -> Dict[str, Any]:
         return self._req("get", json={"to": ""})
@@ -70,6 +77,16 @@ class VBitve:
         params: Optional[Dict[str, str]] = None,
         json: Optional[Dict[str, Union[str, int]]] = None,
     ) -> Dict[str, Any]:
+        cur_time = time()
+        to_sleep = (
+            self._last_req_time
+            + uniform(self._MIN_DELAY, self._MAX_DELAY)
+            - cur_time
+        )
+        self._last_req_time = cur_time
+        if to_sleep > 0:
+            self._last_req_time += to_sleep
+            sleep(to_sleep)
         try:
             with self._s.request(
                 "GET" if json is None else "POST",
@@ -80,14 +97,13 @@ class VBitve:
             ) as req:
                 r: Dict[str, Any] = req.json()
         except Exception as e:
-            self._c.print(f"{get_time()}[red]{endpoint}: {e}[/red]")
-            sleep(uniform(self._MIN_DELAY, self._MAX_DELAY))
+            self.logger.print(f"[red]{endpoint}: {e}[/red]")
             return self._req(endpoint, params=params, json=json)
         if "banned" in r:
-            self._c.print(f"{get_time()}[red]Banned[/red]")
+            self.logger.print("[red]Banned[/red]")
             sys.exit()
         error = r.get("error")
         if error is None:
             return r
-        self._c.print(f"{get_time()}[red]{endpoint}: {error}[/red]")
+        self.logger.print(f"[red]{endpoint}: {error}[/red]")
         return {}

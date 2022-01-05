@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from random import uniform
+from random import choice
 from time import sleep, time
-from typing import Any, Dict, List, NoReturn
+from typing import Any, Callable, Dict, List, NoReturn
 
 from requests import Session
-from rich.console import Console
 from rich.live import Live
 from rich.table import Table
 
-from api import VBitve, get_time
+from api import VBitve
 from config import (
     ATTACK,
     ATTACK_EXCLUDE,
@@ -40,62 +39,45 @@ class Profile:
         self.full_cooldown = min(self.next_attack, self.cooldown)
 
 
-def sleep_delay() -> None:
-    sleep(uniform(MIN_DELAY, MAX_DELAY))
-
-
 def bot(
-    client: VBitve, profile: Profile, console: Console, live: Live
+    client: VBitve, profile: Profile, live: Live, log: Callable[[Any], None]
 ) -> None:
     if ATTACK and profile.next_attack < time() * 1000:
         targets = client.for_me()
-        sleep_delay()
         if targets:
-            users = targets["items"]
-            target = 0
-            for user in users:
-                target = user["id"]
-                if target not in ATTACK_EXCLUDE:
-                    break
-            if target:
+            users = [
+                user
+                for user in targets["items"]
+                if user["id"] not in ATTACK_EXCLUDE
+            ]
+            if users:
+                target = choice(users)["id"]
                 attack = client.attack(target)
                 if attack:
                     profile.update(attack["new_user"])
-                    text = attack["snackbar"]["text"].replace(
-                        "Вы напали и украли:\n", "+"
-                    )
-                    console.print(f"{get_time()}Напал на {target}: {text}")
-                sleep_delay()
+                    text = attack["snackbar"]["text"].split("\n")[-1]
+                    log(f"Напал на id{target}: +{text}")
     if profile.cooldown < time() * 1000:
         if TRAIN and profile.balance >= profile.train_cost:
             train = client.train()
             if train:
                 profile.update(train["new_user"])
-                console.print(
-                    f"{get_time()}Тренирую армию -{profile.train_cost}$"
-                )
+                log(f"Тренирую армию -{profile.train_cost}$")
                 live.update(get_table(profile), refresh=True)
-            sleep_delay()
         elif CONTRACT:
             contract = client.contract()
             if contract:
                 profile.update(contract["new_user"])
-                console.print(
-                    f"{get_time()}Беру контракт +{profile.contract}$"
-                )
+                log(f"Беру контракт +{profile.contract}$")
                 live.update(get_table(profile), refresh=True)
-            sleep_delay()
     time_to_wait = int(profile.full_cooldown / 1000 - time()) + 1
     if time_to_wait > 0:
-        console.print(
-            get_time()
-            + f"Жду {time_to_wait} секунд до окончания ближайшей перезарядки"
-        )
+        log(f"Жду {time_to_wait} секунд до окончания перезарядки")
         sleep(time_to_wait)
 
 
 def get_table(profile: Profile) -> Table:
-    table = Table(title="github.com/monosans/vk-vbitve-bot v20210105")
+    table = Table(title="github.com/monosans/vk-vbitve-bot v20210105.1")
     for header, style in (
         ("Баланс", "cyan"),
         ("Размер армии", "magenta"),
@@ -109,24 +91,17 @@ def get_table(profile: Profile) -> Table:
 
 
 def main() -> NoReturn:
-    console = Console()
     with Session() as session:
         client = VBitve(
-            console,
-            session,
-            VK_AUTH,
-            FRIENDS_HEADER,
-            USER_AGENT,
-            MIN_DELAY,
-            MAX_DELAY,
+            session, VK_AUTH, FRIENDS_HEADER, USER_AGENT, MIN_DELAY, MAX_DELAY
         )
         profile = Profile(client.get())
         with Live(
-            get_table(profile), console=console, auto_refresh=False
+            get_table(profile), console=client.console, auto_refresh=False
         ) as live:
-            sleep_delay()
+            log = client.logger.print
             while True:
-                bot(client, profile, console, live)
+                bot(client, profile, live, log)
 
 
 if __name__ == "__main__":
