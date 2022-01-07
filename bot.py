@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, NoReturn
 
 from requests import Session
 from rich.live import Live
-from rich.table import Table
+from rich.table import Column, Table
 
 from api import VBitve
 from config import (
@@ -38,56 +38,77 @@ class Profile:
         self.cooldown = max(self.next_contract, self.next_train)
         self.full_cooldown = min(self.next_attack, self.cooldown)
 
+    @property
+    def table(self) -> Table:
+        table = Table(
+            Column("Баланс", style="cyan", justify="center"),
+            Column("Размер армии", style="magenta", justify="center"),
+            Column("Сила армии", style="green", justify="center"),
+            title="github.com/monosans/vk-vbitve-bot v20220107",
+        )
+        table.add_row(*map(str, (self.balance, len(self.army), self.power)))
+        return table
+
+
+def attack(
+    target: int,
+    client: VBitve,
+    profile: Profile,
+    live: Live,
+    log: Callable[[Any], None],
+) -> None:
+    attack = client.attack(target)
+    if attack:
+        profile.update(attack["new_user"])
+        live.update(profile.table, refresh=True)
+        text = attack["snackbar"]["text"].split("\n")[-1]
+        log(f"Напал на id{target}: +{text}")
+
 
 def bot(
     client: VBitve, profile: Profile, live: Live, log: Callable[[Any], None]
 ) -> None:
     if ATTACK and profile.next_attack < time() * 1000:
-        targets = client.for_me()
-        if targets:
+        wars = client.clan_me().get("active_wars")
+        if wars:
+            war = choice(wars)
+            try:
+                enemy_clan = war["clan"]
+            except KeyError:
+                enemy_clan = war["attackedClan"]
+            target_clan = client.clan(enemy_clan["id"])
+            if target_clan:
+                army = target_clan["army"]
+                suitable_enemies = [
+                    enemy for enemy in army if enemy["power"] < profile.power
+                ]
+                target = suitable_enemies[0] if suitable_enemies else army[-1]
+                attack(target["id"], client, profile, live, log)
+        else:
             users = [
                 user
-                for user in targets["items"]
+                for user in client.for_me().get("items", {})
                 if user["id"] not in ATTACK_EXCLUDE
             ]
             if users:
-                target = choice(users)["id"]
-                attack = client.attack(target)
-                if attack:
-                    profile.update(attack["new_user"])
-                    text = attack["snackbar"]["text"].split("\n")[-1]
-                    log(f"Напал на id{target}: +{text}")
+                attack(choice(users)["id"], client, profile, live, log)
     if profile.cooldown < time() * 1000:
         if TRAIN and profile.balance >= profile.train_cost:
             train = client.train()
             if train:
                 profile.update(train["new_user"])
+                live.update(profile.table, refresh=True)
                 log(f"Тренирую армию -{profile.train_cost}$")
-                live.update(get_table(profile), refresh=True)
         elif CONTRACT:
             contract = client.contract()
             if contract:
                 profile.update(contract["new_user"])
+                live.update(profile.table, refresh=True)
                 log(f"Беру контракт +{profile.contract}$")
-                live.update(get_table(profile), refresh=True)
     time_to_wait = int(profile.full_cooldown / 1000 - time()) + 1
     if time_to_wait > 0:
         log(f"Жду {time_to_wait} секунд до окончания перезарядки")
         sleep(time_to_wait)
-
-
-def get_table(profile: Profile) -> Table:
-    table = Table(title="github.com/monosans/vk-vbitve-bot v20210105.1")
-    for header, style in (
-        ("Баланс", "cyan"),
-        ("Размер армии", "magenta"),
-        ("Сила армии", "green"),
-    ):
-        table.add_column(header, style=style, justify="center")
-    table.add_row(
-        *map(str, (profile.balance, len(profile.army), profile.power))
-    )
-    return table
 
 
 def main() -> NoReturn:
@@ -97,7 +118,7 @@ def main() -> NoReturn:
         )
         profile = Profile(client.get())
         with Live(
-            get_table(profile), console=client.console, auto_refresh=False
+            profile.table, console=client.console, auto_refresh=False
         ) as live:
             log = client.logger.print
             while True:

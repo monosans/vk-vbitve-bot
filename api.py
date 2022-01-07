@@ -70,6 +70,12 @@ class VBitve:
     def train(self) -> Dict[str, Any]:
         return self._req("train")
 
+    def clan_me(self) -> Dict[str, Any]:
+        return self._req("clan", params={"me": "1"})
+
+    def clan(self, clan_id: str) -> Dict[str, Any]:
+        return self._req("clan", params={"clan": clan_id})
+
     def _req(
         self,
         endpoint: str,
@@ -97,13 +103,13 @@ class VBitve:
             ) as req:
                 r: Dict[str, Any] = req.json()
         except Exception as e:
-            self.logger.print(f"[red]{endpoint}: {e}[/red]")
+            self.logger.print(f"[red]{endpoint}: {e}")
             return self._req(endpoint, params=params, json=json)
         if "banned" in r:
-            self.logger.print("[red]Banned[/red]")
+            self.logger.print("[red]Banned")
             sys.exit()
         error = r.get("error")
         if error is None:
             return r
-        self.logger.print(f"[red]{endpoint}: {error}[/red]")
+        self.logger.print(f"[red]{endpoint}: {error}")
         return {}
