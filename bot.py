@@ -17,6 +17,7 @@ from config import (
     TRAIN,
     USER_AGENT,
     VK_ADMIN_TOKEN,
+    VK_AUTH_HEADER,
 )
 
 
@@ -42,7 +43,7 @@ class Profile:
             Column("Баланс", style="cyan", justify="center"),
             Column("Размер армии", style="magenta", justify="center"),
             Column("Сила армии", style="green", justify="center"),
-            title="github.com/monosans/vk-vbitve-bot v20220108",
+            title="github.com/monosans/vk-vbitve-bot v20220108.1",
         )
         table.add_row(*map(str, (self.balance, len(self.army), self.power)))
         return table
@@ -111,8 +112,14 @@ def bot(
 
 def main() -> NoReturn:
     with Session() as session:
-        client = VBitve(session, VK_ADMIN_TOKEN, FRIENDS_HEADER, USER_AGENT)
-        profile = Profile(client.get())
+        client = VBitve(
+            session, VK_ADMIN_TOKEN, VK_AUTH_HEADER, FRIENDS_HEADER, USER_AGENT
+        )
+        while True:
+            get = client.get()
+            if get:
+                break
+        profile = Profile(get)
         with Live(
             profile.table, console=client.console, auto_refresh=False
         ) as live:

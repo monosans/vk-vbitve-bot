@@ -3,6 +3,7 @@
 
 # Обязательно к изменению
 VK_ADMIN_TOKEN = ""
+VK_AUTH_HEADER = "vk_access_token_settings..."
 FRIENDS_HEADER = ""
 
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"

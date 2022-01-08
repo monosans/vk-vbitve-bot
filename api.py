@@ -29,12 +29,14 @@ class VBitve:
         self,
         session: Session,
         vk_admin_token: str,
+        vk_auth_header: str,
         friends_header: str,
         user_agent: str,
         console: Optional[Console] = None,
     ) -> None:
         """
         vk_admin_token (str): VK Admin токен с vkhost.github.io.
+        vk_auth_header (str): vk_access_token_settings...
         user_agent (str): User agent браузера.
         """
         self._s = session
@@ -49,22 +51,22 @@ class VBitve:
                 "platform": "web",
             },
         ) as res:
-            r = res.json()
-        response = r.get("response")
+            r: Dict[str, Any] = res.json()
+        response: Optional[Dict[str, Any]] = r.get("response")
         if not response:
             raise IncorrectToken("Неверный токен.")
-        webview_url = response["items"][0].get("webview_url")
+        webview_url: Optional[str] = response["items"][0].get("webview_url")
         if not webview_url:
             raise IncorrectTokenType(
                 "Токен неверного типа. Нужен VK Admin токен."
             )
-        origin, vk_auth = webview_url.split("/index.html?")
+        origin = webview_url.split("/index.html?")[0]
         self._headers = {
             "friends": str(friends_header),
             "origin": origin,
             "referer": f"{origin}/",
             "user-agent": user_agent.strip(),
-            "vk-auth": vk_auth,
+            "vk-auth": vk_auth_header.strip(),
         }
         self.console = console or Console()
         self.logger = Logger(self.console)
