@@ -8,6 +8,14 @@ from requests import Session
 from rich.console import Console
 
 
+class IncorrectToken(Exception):
+    """Неверный токен."""
+
+
+class IncorrectTokenType(Exception):
+    """Токен неверного типа. Нужен VK Admin токен."""
+
+
 class Logger:
     def __init__(self, console: Console) -> None:
         self._c = console
@@ -20,32 +28,46 @@ class VBitve:
     def __init__(
         self,
         session: Session,
-        vk_auth: str,
+        vk_admin_token: str,
         friends_header: str,
         user_agent: str,
-        min_delay: float,
-        max_delay: float,
         console: Optional[Console] = None,
     ) -> None:
         """
-        vk_auth (str): vk_access_token_settings...
+        vk_admin_token (str): VK Admin токен с vkhost.github.io.
         user_agent (str): User agent браузера.
-        min_delay (float): Мин. задержка между запросами в секундах.
-        max_delay (float): Макс. задержка между запросами в секундах.
         """
-        self.console = console or Console()
-        self.logger = Logger(self.console)
         self._s = session
-        origin = "https://prod-app7801617-8a6f43695867.pages-ac.vk-apps.com"
+        with session.get(
+            "https://api.vk.com/method/apps.get",
+            params={
+                "access_token": vk_admin_token.split("access_token=")[-1]
+                .split("&expires_in")[0]
+                .strip(),
+                "v": "5.131",
+                "app_id": "7801617",
+                "platform": "web",
+            },
+        ) as res:
+            r = res.json()
+        response = r.get("response")
+        if not response:
+            raise IncorrectToken("Неверный токен.")
+        webview_url = response["items"][0].get("webview_url")
+        if not webview_url:
+            raise IncorrectTokenType(
+                "Токен неверного типа. Нужен VK Admin токен."
+            )
+        origin, vk_auth = webview_url.split("/index.html?")
         self._headers = {
             "friends": str(friends_header),
             "origin": origin,
             "referer": f"{origin}/",
             "user-agent": user_agent.strip(),
-            "vk-auth": vk_auth.strip(),
+            "vk-auth": vk_auth,
         }
-        self._MIN_DELAY = min_delay
-        self._MAX_DELAY = max_delay
+        self.console = console or Console()
+        self.logger = Logger(self.console)
         self._last_req_time: float = 0
 
     def get(self) -> Dict[str, Any]:
@@ -84,11 +106,7 @@ class VBitve:
         json: Optional[Dict[str, Union[str, int]]] = None,
     ) -> Dict[str, Any]:
         cur_time = time()
-        to_sleep = (
-            self._last_req_time
-            + uniform(self._MIN_DELAY, self._MAX_DELAY)
-            - cur_time
-        )
+        to_sleep = self._last_req_time + uniform(3, 5) - cur_time
         self._last_req_time = cur_time
         if to_sleep > 0:
             self._last_req_time += to_sleep
