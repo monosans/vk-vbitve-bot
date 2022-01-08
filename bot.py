@@ -43,7 +43,7 @@ class Profile:
             Column("Баланс", style="cyan", justify="center"),
             Column("Размер армии", style="magenta", justify="center"),
             Column("Сила армии", style="green", justify="center"),
-            title="github.com/monosans/vk-vbitve-bot v20220108.1",
+            title="github.com/monosans/vk-vbitve-bot v20220108.2",
         )
         table.add_row(*map(str, (self.balance, len(self.army), self.power)))
         return table
@@ -64,33 +64,46 @@ def attack(
         log(f"Напал на id{target}: +{text}")
 
 
+def attack_random(
+    client: VBitve, profile: Profile, live: Live, log: Callable[[Any], None]
+) -> None:
+    users = [
+        user
+        for user in client.for_me().get("items", {})
+        if user["id"] not in ATTACK_EXCLUDE
+    ]
+    if users:
+        attack(choice(users)["id"], client, profile, live, log)
+
+
 def bot(
     client: VBitve, profile: Profile, live: Live, log: Callable[[Any], None]
 ) -> None:
     if ATTACK and profile.next_attack < time() * 1000:
-        wars = client.clan_me().get("active_wars")
-        if wars:
-            war = choice(wars)
-            try:
-                enemy_clan = war["clan"]
-            except KeyError:
-                enemy_clan = war["attackedClan"]
-            target_clan = client.clan(enemy_clan["id"])
-            if target_clan:
-                army = target_clan["army"]
-                suitable_enemies = [
-                    enemy for enemy in army if enemy["power"] < profile.power
-                ]
-                target = suitable_enemies[0] if suitable_enemies else army[-1]
-                attack(target["id"], client, profile, live, log)
+        if ATTACK == 2:
+            wars = client.clan_me().get("active_wars")
+            if wars:
+                war = choice(wars)
+                try:
+                    enemy_clan = war["clan"]
+                except KeyError:
+                    enemy_clan = war["attackedClan"]
+                target_clan = client.clan(enemy_clan["id"])
+                if target_clan:
+                    army = target_clan["army"]
+                    suitable_enemies = [
+                        enemy
+                        for enemy in army
+                        if enemy["power"] < profile.power
+                    ]
+                    target = (
+                        suitable_enemies[0] if suitable_enemies else army[-1]
+                    )
+                    attack(target["id"], client, profile, live, log)
+            else:
+                attack_random(client, profile, live, log)
         else:
-            users = [
-                user
-                for user in client.for_me().get("items", {})
-                if user["id"] not in ATTACK_EXCLUDE
-            ]
-            if users:
-                attack(choice(users)["id"], client, profile, live, log)
+            attack_random(client, profile, live, log)
     if profile.cooldown < time() * 1000:
         if TRAIN and profile.balance >= profile.train_cost:
             train = client.train()
