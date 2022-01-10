@@ -10,8 +10,9 @@ from rich.table import Column, Table
 
 from api import VBitve
 from config import (
-    ATTACK,
     ATTACK_EXCLUDE,
+    ATTACK_MODE,
+    ATTACK_TARGETS,
     CONTRACT,
     FRIENDS_HEADER,
     TRAIN,
@@ -43,7 +44,7 @@ class Profile:
             Column("Баланс", style="cyan", justify="center"),
             Column("Размер армии", style="magenta", justify="center"),
             Column("Сила армии", style="green", justify="center"),
-            title="github.com/monosans/vk-vbitve-bot v20220108.2",
+            title="github.com/monosans/vk-vbitve-bot v20220110",
         )
         table.add_row(*map(str, (self.balance, len(self.army), self.power)))
         return table
@@ -79,8 +80,8 @@ def attack_random(
 def bot(
     client: VBitve, profile: Profile, live: Live, log: Callable[[Any], None]
 ) -> None:
-    if ATTACK and profile.next_attack < time() * 1000:
-        if ATTACK == 2:
+    if ATTACK_MODE and profile.next_attack < time() * 1000:
+        if ATTACK_MODE == 2:
             wars = client.clan_me().get("active_wars")
             if wars:
                 war = choice(wars)
@@ -102,6 +103,8 @@ def bot(
                     attack(target["id"], client, profile, live, log)
             else:
                 attack_random(client, profile, live, log)
+        elif ATTACK_MODE == 3:
+            attack(choice(ATTACK_TARGETS), client, profile, live, log)
         else:
             attack_random(client, profile, live, log)
     if profile.cooldown < time() * 1000:
